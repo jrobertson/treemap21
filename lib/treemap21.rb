@@ -25,20 +25,23 @@ class Treemap21
   <head>
 <style>
 
-    .cbox, .long, .cbox1 {
+    .cbox, .long, .cbox1, .cbox1 a {
         width: 100%;
         height: 100%;
     }
     .cbox1 ~.long, .cbox1 {
         float: left;
     }
-    .cbox1 {
+    .cbox1, .cbox1 a {
         display: flex;
         justify-content: center;
         align-items: center;
     }
 
-    .cbox1 span {  background-color: transparent;}
+    .cbox1 a { text-decoration: none; color: #010; font-family: helvetica, arial}
+    .cbox1 a:hover { background-color: rgba(255,255,255,0.2); color: #902}
+
+    .cbox1 span {  background-color: transparent;  }
 
     .c10 {font-size: 8em}
     .c9 {font-size: 7.5em}
@@ -46,9 +49,9 @@ class Treemap21
     .c7 {font-size: 5.0em}
     .c6 {font-size: 4.9em}
     .c5 {font-size: 4.5em}
-    .c4 {font-size: 3.2em}
-    .c3 {font-size: 2.1em}
-    .c2 {font-size: 1.9em}
+    .c4 {font-size: 3.6em}
+    .c3 {font-size: 2.6em}
+    .c2 {font-size: 2.4em}
     .c1 {font-size: 1.6em}
     .c0 {font-size: 1.1em}
 
@@ -66,15 +69,25 @@ EOF
 
   private
 
-  def add_box(text, attr={}, cfont)
+  def add_box(text, url=nil, attr={}, cfont)
 
     a = attr.map {|key, value| "%s: %s" % [key, value]}
     h = {class: 'cbox1 ' + cfont, style:  a.join('; ')}
     span = Rexle::Element.new('span', value: text)
     doc = Rexle::Element.new('div', attributes: h)
-    doc.root.add span
-    doc.root
 
+    
+    if url then
+      anchor = Rexle::Element.new('a', attributes: {href: url})
+      anchor.root.add span
+      doc.root.add anchor.root
+    else
+      doc.root.add span
+      
+    end
+    
+    doc.root
+    
   end
 
   def mapper(doc, a, orientation: :landscape, total: 100)
@@ -95,9 +108,9 @@ EOF
     bgcolor = 3.times.map { rand(60..250).to_s(16) }.join
     
     # find the largest box
-    a2 = a.sort_by(&:last).reverse
+    a2 = a.sort_by {|_, percent, _| percent}.reverse
     puts 'a2.first: ' + a2.first.inspect if @debug
-    title, percent = a2.first
+    title, percent, url = a2.first
     
     remainder = total - percent
     # how much space does the largest box take?
@@ -119,7 +132,7 @@ EOF
       dimension => rem.round.to_s + '%'
     }
     
-    e = add_box(title, style, ("c%02d" % percent).to_s[0..-2])
+    e = add_box(title, url, style, ("c%02d" % percent).to_s[0..-2])
     puts 'e: ' + e.inspect if @debug
 
     doc.root.add e
@@ -130,7 +143,8 @@ EOF
       doc3 = Rexle.new("<div class='%s' style='%s: %s%%'/>" % [klass, dim2, 
         rem2.round.to_s])
 
-      doc2 = mapper(doc3, a2[1..-1], orientation: new_orientation, total: remainder)
+      doc2 = mapper(doc3, a2[1..-1], orientation: new_orientation, 
+                    total: remainder)
 
       doc.root.add doc2.root
 
