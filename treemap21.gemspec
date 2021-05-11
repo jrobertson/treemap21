@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name = 'treemap21'
-  s.version = '0.1.2'
+  s.version = '0.1.3'
   s.summary = 'Experimental treemapping gem which generates an HTML document.'
   s.authors = ['James Robertson']
   s.files = Dir['lib/treemap21.rb']
