@@ -1,3 +1,23 @@
+# Treemap21: String input with a tree format
+
+    require 'treemap21'
+
+    s = "
+    Company 101 # 34 # http://a0.jamesrobertson.me.uk
+    Group A # 33 # #groupa
+      Company 301 # 444 # #company301
+      Company 401 # 200 # #company401
+    "
+
+    tm = Treemap21.new s, debug: true
+    puts tm.to_html
+    File.write '/tmp/treemap.html', tm.to_html
+    `chromium /tmp/treemap.html`
+
+treemap treemap21 tree
+
+----------------------------------------------
+
 # Introducing the Treemap21 gem
 
 ## Usage
