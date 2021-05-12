@@ -3,15 +3,51 @@
 # file: treemap21.rb
 
 require 'rexle'
+require 'polyrex'
 
 
 class Treemap21
   
   attr_reader :to_html
 
-  def initialize(a, orientation: :landscape, debug: false)
+  def initialize(obj, orientation: :landscape, debug: false)
 
-    @a, @orientation, @debug = a, orientation, debug
+    @orientation, @debug = orientation, debug
+        
+    @a = case obj
+    when Array
+      a
+    when String
+
+      if obj.lstrip =~ /<?polyrex / then
+        
+        px = Polyrex.new obj                
+        doc = Rexle.new(px.to_tree)
+        scan_xml(doc.root)        
+      
+      elsif obj.lstrip =~ /</ then
+        
+        doc = Rexle.new(obj)
+        scan_xml(doc.root)        
+        
+      else
+        
+        # most likely a raw polyrex document without the processing 
+        # instruction or header
+        
+        head =  "<?polyrex schema='items[title, description]/item[title," +
+            " pct, url]' delimiter=' # '?>\ntitle: Unititled\ndescription: " + 
+            "Treemap record data"
+
+        s = head + "\n\n" + obj.lstrip
+        px = Polyrex.new s
+        doc = Rexle.new(px.to_tree)
+        scan_xml(doc.root)        
+        
+      end
+      
+    end
+
     @to_html = build_html()
     
   end
@@ -67,7 +103,7 @@ class Treemap21
       background-color: #111;
       width: 100%;
       height: 30px;
-      color: #fff; font-size: 1.6em;
+      color: #fff; font-size: 1.6vw;
       position: absolute;
       z-index: 1
     }
@@ -82,24 +118,23 @@ class Treemap21
 
     .group {      border: 0px solid black;}    
 
-    .c10 {font-size: 8em}
-    .c9 {font-size: 7.5em}
-    .c8 {font-size: 6em}
-    .c7 {font-size: 5.0em}
-    .c6 {font-size: 4.9em}
-    .c5 {font-size: 4.5em}
-    .c4 {font-size: 3.6em}
-    .c3 {font-size: 2.6em}
-    .c2 {font-size: 2.4em}
-    .c1 {font-size: 1.6em}
-    .c0 {font-size: 1.1em}
+    .c10 {font-size: 8vw}
+    .c9 {font-size: 7.5vw}
+    .c8 {font-size: 6vw}
+    .c7 {font-size: 5.0vw}
+    .c6 {font-size: 4.9vw}
+    .c5 {font-size: 4.5vw}
+    .c4 {font-size: 3.6vw}
+    .c3 {font-size: 2.6vw}
+    .c2 {font-size: 2.4vw}
+    .c1 {font-size: 1.6vw}
+    .c0 {font-size: 1.1vw}
     
     #{cbox_css.join("\n")}
 
 </style>
   </head>
 <body>
-
 
 #{boxes}
 
@@ -116,8 +151,7 @@ EOF
     
     h = {
       id: 'cbox' + @count.to_s,
-      class: 'cbox1 ' + cfont#, 
-      #style:  a.join('; ')    
+      class: 'cbox1 ' + cfont
     }
     @count = @count + 1
     
@@ -153,10 +187,28 @@ EOF
       'cbox'
     end
     
+    a.map! do |x|
+      x[1] = x[1].nil? ? 1 : x[1].to_f
+      x
+    end
+    
     # find the largest box
-    a2 = a.sort_by {|_, percent, _| percent}
-    puts 'a2.first: ' + a2.first.inspect if @debug
-    item = a2.pop
+    a2 = a.sort_by {|_, val, _| val}
+    
+    # get the total value
+    total = a2.sum {|x| x[1]}
+    puts 'total ; ' + total.inspect if @debug
+
+    
+    # calculate the percentages
+    a3 = a2.map do |title, val, url, list|
+      apct = 100 / (total / val.to_f)
+      [title, val, url, list, apct]
+    end
+    puts 'a3: ' + a3.inspect if @debug
+    
+    puts 'a3.first: ' + a3.first.inspect if @debug
+    item = a3.pop
 
     percent = item[1]
     remainder = total - percent
@@ -186,61 +238,79 @@ EOF
     if item[3].is_a? Array then
       
       # it's a group item
-      group_name = item[0]
+      group_name, url = item.values_at(0, 2)
       #<div class='glabel'>  <span>Group A</span>      </div>      
-      group = Rexle::Element.new('div', attributes: {class: 'glabel'})
+      group = Rexle::Element.new('div', attributes: {class: 'glabel'})      
       span = Rexle::Element.new('span', value: group_name)
-      group.add span
+      
+      if url then
+        
+        anchor = Rexle::Element.new('a', attributes: {href: url})
+        anchor.root.add span
+        group.add anchor.root
+        
+      else
+        
+        group.add span
+        
+      end
+            
       div.add group
       
       doc4 = Rexle.new("<div id='box%s' class='%s' style='%s: %s%%'/>" % \
-                       [@counter, klass, dimension, rem_pct.round.to_s])      
-      mapper(div, item[3], scale: scale)
+                       [@counter, klass, dimension, rem_pct.round.to_s])            
+      
+      mapper(div, item[3], orientation: orientation, scale: scale)
 
       group_foot = Rexle::Element.new('div', attributes: {class: 'gfoot'})
       div.add group_foot      
       
     else
       
-      title, percent, url = item
-
+      title, value, url, list, percent = item
 
       factor = scale / (100 / percent.to_f)
-      puts 'scale: ' + scale.inspect
-      puts 'percent: ' + percent.inspect
-      puts 'factor: ' + factor.inspect
+      
+      if @debug then
+        puts 'scale: ' + scale.inspect
+        puts 'percent: ' + percent.inspect
+        puts 'factor: ' + factor.inspect
+      end
+      
       e = add_box(title, url, {}, ("c%02d" % factor).to_s[0..-2])
       puts 'e: ' + e.inspect if @debug
-      
-      
-    end
-        
-    
-    # add the group if there is any
-    if group_name then
-      
-
-      #div.add diva
-      
-    end
+            
+    end        
     
     div.add e
     doc.root.add div
 
-    if a2.any? then
+    if a3.any? then
 
       doc3 = Rexle.new("<div id='box%s' class='%s' style='%s: %s%%'/>" % \
                        [@counter, klass, dimension, rem_pct.round.to_s])
       @counter += 1
 
-      doc2 = mapper(doc3, a2, orientation: new_orientation, total: remainder, scale: rem_pct.round)
+      doc2 = mapper(doc3, a3, orientation: new_orientation, total: remainder, 
+                    scale: rem_pct.round)
       doc.root.add doc2.root
 
-    end
-    
-    #<div class='gfoot'>   </div>
+    end    
     
     return doc
+
+  end
+  
+  def scan_xml(e)
+
+    e.xpath('item').map do |node|
+
+      title, pct, url = node.attributes.values
+
+      r = [title, pct, url]
+      r << scan_xml(node) if node.children.any?
+      r
+    end
 
   end
 
