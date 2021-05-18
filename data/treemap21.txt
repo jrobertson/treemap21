@@ -1,0 +1,104 @@
+:html
+<html>
+  <head>
+    <title>#{@title}</title>
+<style>
+    .cbox, .long, .cbox1, .cbox1 a {
+        width: 100%;
+        height: 100%;
+    }
+    .long, .cbox1 {
+        float: left;
+    }
+    .cbox1, .cbox1 a {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .cbox1 {
+      outline: 4px solid #000;
+      outline-offset: -2px;
+      font-size: 4.5em;
+     }
+
+    .cbox1 a { 
+      text-decoration: none;
+      color: #010; 
+      font-family: helvetica, arial; 
+      color: #115; 
+    }
+    
+    .cbox1 a:hover { background-color: rgba(255,255,255,0.2); color: #902}
+    .cbox1 span {  background-color: transparent; color2: #300 }
+    
+    .cbox {position: relative;}
+
+    .glabel {
+      background-color: #111;
+      width: 100%;
+      color: #fff; font-size: 200%;
+      position: absolute;
+      z-index: 1
+    }
+
+    .glabel a {
+      color: #fff; text-decoration: none; width: 100%; display: block;
+     }
+    .glabel a:hover {
+      background-color: #ff9; color: #000;
+     }
+
+    .gfoot {
+      background-color: #111;
+      width: 100%;
+      height: 20px;
+      position: absolute;
+      bottom: 0;
+     }
+
+    .group {      border: 0px solid black;}    
+
+    .c10 {font-size: 8vw}
+    .c9 {font-size: 7.5vw}
+    .c8 {font-size: 6vw}
+    .c7 {font-size: 5.0vw}
+    .c6 {font-size: 4.9vw}
+    .c5 {font-size: 4.5vw}
+    .c4 {font-size: 3.6vw}
+    .c3 {font-size: 2.6vw}
+    .c2 {font-size: 2.4vw}
+    .c1 {font-size: 1.6vw}
+    .c0 {font-size: 1.1vw}
+    
+    #{cbox_css.join("\n")}
+
+</style>
+  </head>
+<body onmousemove='scale_reset()'>
+ #{boxes}
+    <script src='https://unpkg.com/panzoom@9.4.0/dist/panzoom.min.js'></script>
+    <script>
+// just grab a DOM element
+var element = document.querySelector('#box1')
+
+// And pass it to panzoom
+panzoom(element)
+    </script>
+<script>
+function scale_reset() {
+
+  e = document.getElementById("box1");
+  console.info('transform: ' + e.style.transform);
+  s = e.style.transform;
+  a = s.split(/\\D+/);
+  scale = parseFloat(a[1]);
+  console.info('scale: ' + scale);
+  if (scale < 1) {
+    location.reload();
+  }
+}
+</script>
+    
+</body>
+</html>
