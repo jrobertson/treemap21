@@ -2,17 +2,21 @@
 
 # file: treemap21.rb
 
+require 'c32'
 require 'rexle'
+require 'weblet'
 require 'polyrex'
 
 
 class Treemap21
+  using ColouredText
   
-  attr_reader :to_html
+  attr_reader :to_html, :title
 
-  def initialize(obj, orientation: :landscape, debug: false)
+  def initialize(obj, orientation: :landscape, title: 'Treemap', 
+                 weblet_file: nil, debug: false)
 
-    @orientation, @debug = orientation, debug
+    @orientation, @title, @debug = orientation, title, debug
         
     @a = case obj
     when Array
@@ -48,13 +52,15 @@ class Treemap21
       
     end
 
-    @to_html = build_html()
+    weblet_file ||= File.join(File.dirname(__FILE__), '..', 'data',
+                              'treemap21.txt')      
+    @to_html = build_html(weblet_file)
     
   end
   
   private
 
-  def build_html()
+  def build_html(weblet_file)
     
     # used for the box id
     @counter, @count = 2, 1
@@ -68,82 +74,13 @@ class Treemap21
     end
     
     boxes = doc.root.xml pretty: true
+    w = Weblet.new(weblet_file)
+
+    w.render :html, binding
     
-
-<<EOF
-<html>
-  <head>
-<style>
-    .cbox, .long, .cbox1, .cbox1 a {
-        width: 100%;
-        height: 100%;
-    }
-    .long, .cbox1 {
-        float: left;
-    }
-    .cbox1, .cbox1 a {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
-
-    .cbox1 a { 
-      text-decoration: none;
-      color: #010; 
-      font-family: helvetica, arial; 
-      color: #115; 
-    }
-    
-    .cbox1 a:hover { background-color: rgba(255,255,255,0.2); color: #902}
-    .cbox1 span {  background-color: transparent; color2: #300 }
-    
-    .cbox {position: relative}
-
-    .glabel {
-      background-color: #111;
-      width: 100%;
-      height: 30px;
-      color: #fff; font-size: 1.6vw;
-      position: absolute;
-      z-index: 1
-    }
-
-    .gfoot {
-      background-color: #111;
-      width: 100%;
-      height: 20px;
-      position: absolute;
-      bottom: 0;
-     }
-
-    .group {      border: 0px solid black;}    
-
-    .c10 {font-size: 8vw}
-    .c9 {font-size: 7.5vw}
-    .c8 {font-size: 6vw}
-    .c7 {font-size: 5.0vw}
-    .c6 {font-size: 4.9vw}
-    .c5 {font-size: 4.5vw}
-    .c4 {font-size: 3.6vw}
-    .c3 {font-size: 2.6vw}
-    .c2 {font-size: 2.4vw}
-    .c1 {font-size: 1.6vw}
-    .c0 {font-size: 1.1vw}
-    
-    #{cbox_css.join("\n")}
-
-</style>
-  </head>
-<body>
-
-#{boxes}
-
-</body>
-</html>
-EOF
   end
 
-  def add_box(text, url=nil, attr={}, cfont)
+  def add_box(text, url=nil, attr={})
     
     span = Rexle::Element.new('span', value: text)
     
@@ -151,14 +88,14 @@ EOF
     
     h = {
       id: 'cbox' + @count.to_s,
-      class: 'cbox1 ' + cfont
+      class: 'cbox1 '
     }
     @count = @count + 1
     
     doc = Rexle::Element.new('div', attributes: h)
     
     if url then
-      anchor = Rexle::Element.new('a', attributes: {href: url})
+      anchor = Rexle::Element.new('a', attributes: {href: url, draggable: 'false'})
       anchor.root.add span
       doc.root.add anchor.root
     else
@@ -170,13 +107,12 @@ EOF
     
   end
 
-  def mapper(doc, a, orientation: :landscape, total: 100, scale: 100)
+  def mapper(doc, a, orientation: :landscape, total: 100)
     
     if @debug then
       puts 'a: ' + a.inspect
       puts 'orientation: ' + orientation.inspect 
       puts 'total: ' + total.inspect
-      puts 'scale: ' + scale.inspect
     end
 
     klass = if orientation == :landscape then
@@ -216,7 +152,7 @@ EOF
     rpct  = 100 / (total / percent.to_f)
     rem_pct  = 100 - rpct
 
-    new_orientation = if rpct.round <= 33 and rpct.round  >= 3 then
+    new_orientation = if rpct.round <= 133 and rpct.round  >= 9993 then
       orientation
     else
       orientation == :landscape ? :portrait : :landscape
@@ -225,11 +161,12 @@ EOF
     puts 'new_orientation: ' + new_orientation.inspect if @debug
     
     dimension = orientation == :landscape ? :width : :height    
-    style = { dimension => rpct.round.to_s + '%'  }
+    hstyle = { dimension => rpct.round.to_s + '%'  }
+    style = hstyle.map {|key, value| "%s: %s" % [key, value]}.join(';')
     
     h = {
       class: klass,
-      style: style.map {|key, value| "%s: %s" % [key, value]}.join(';')
+      style: style
     }
     
     div = Rexle::Element.new('div', attributes: h)      
@@ -240,7 +177,7 @@ EOF
       # it's a group item
       group_name, url = item.values_at(0, 2)
       #<div class='glabel'>  <span>Group A</span>      </div>      
-      group = Rexle::Element.new('div', attributes: {class: 'glabel'})      
+      group = Rexle::Element.new('div', attributes: {style: style, class: 'glabel'})      
       span = Rexle::Element.new('span', value: group_name)
       
       if url then
@@ -256,28 +193,28 @@ EOF
       end
             
       div.add group
-      
-      doc4 = Rexle.new("<div id='box%s' class='%s' style='%s: %s%%'/>" % \
-                       [@counter, klass, dimension, rem_pct.round.to_s])            
-      
-      mapper(div, item[3], orientation: orientation, scale: scale)
 
-      group_foot = Rexle::Element.new('div', attributes: {class: 'gfoot'})
-      div.add group_foot      
+      style = "%s: %s%%; font-size: %s%%" % [ dimension, rem_pct.round, 
+                                            rem_pct.round]      
+      doc4 = Rexle.new("<div id='box%s' class='%s' style='%s'/>" % \
+                       [@counter, klass, style])            
+      puts ('rem_pct: ' + rem_pct.inspect).debug if @debug
+      mapper(div, item[3], orientation: orientation)
+
+      #group_foot = Rexle::Element.new('div', attributes: {class: 'gfoot'})
+      #div.add group_foot      
       
     else
       
       title, value, url, list, percent = item
 
-      factor = scale / (100 / percent.to_f)
       
       if @debug then
-        puts 'scale: ' + scale.inspect
         puts 'percent: ' + percent.inspect
-        puts 'factor: ' + factor.inspect
       end
       
-      e = add_box(title, url, {}, ("c%02d" % factor).to_s[0..-2])
+      #e = add_box(title, url, {}, ("c%02d" % factor).to_s[0..-2])
+      e = add_box(title, url, {})
       puts 'e: ' + e.inspect if @debug
             
     end        
@@ -287,12 +224,14 @@ EOF
 
     if a3.any? then
 
-      doc3 = Rexle.new("<div id='box%s' class='%s' style='%s: %s%%'/>" % \
-                       [@counter, klass, dimension, rem_pct.round.to_s])
+      style = "%s: %s%%; font-size: %s%%" % [ dimension, rem_pct.round, 
+                                            rem_pct.round + 15]
+      doc3 = Rexle.new("<div id='box%s' class='%s' style='%s'/>" % \
+                       [@counter, klass, style])
       @counter += 1
 
-      doc2 = mapper(doc3, a3, orientation: new_orientation, total: remainder, 
-                    scale: rem_pct.round)
+      puts ('_rem_pct: ' + rem_pct.inspect).debug if @debug
+      doc2 = mapper(doc3, a3, orientation: new_orientation, total: remainder)
       doc.root.add doc2.root
 
     end    
